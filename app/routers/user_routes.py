@@ -33,9 +33,14 @@ from app.services.jwt_service import create_access_token
 from app.utils.link_generation import create_user_links, generate_pagination_links
 from app.dependencies import get_settings
 from app.services.email_service import EmailService
+from app.utils.security import hash_password
+import logging
+
 router = APIRouter()
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="login")
 settings = get_settings()
+logger = logging.getLogger(__name__)
+
 @router.get("/users/{user_id}", response_model=UserResponse, name="get_user", tags=["User Management Requires (Admin or Manager Roles)"])
 async def get_user(user_id: UUID, request: Request, db: AsyncSession = Depends(get_db), token: str = Depends(oauth2_scheme), current_user: dict = Depends(require_role(["ADMIN", "MANAGER"]))):
     """
@@ -79,7 +84,14 @@ async def get_user(user_id: UUID, request: Request, db: AsyncSession = Depends(g
 # experience by adhering to REST principles and providing self-discoverable operations.
 
 @router.put("/users/{user_id}", response_model=UserResponse, name="update_user", tags=["User Management Requires (Admin or Manager Roles)"])
-async def update_user(user_id: UUID, user_update: UserUpdate, request: Request, db: AsyncSession = Depends(get_db), token: str = Depends(oauth2_scheme), current_user: dict = Depends(require_role(["ADMIN", "MANAGER"]))):
+async def update_user(
+    user_id: UUID,
+    user_update: UserUpdate,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    token: str = Depends(oauth2_scheme),
+    current_user: dict = Depends(require_role(["ADMIN", "MANAGER"]))
+):
     """
     Update user information.
 
@@ -87,26 +99,37 @@ async def update_user(user_id: UUID, user_update: UserUpdate, request: Request, 
     - **user_update**: UserUpdate model with updated user information.
     """
     user_data = user_update.model_dump(exclude_unset=True)
-    updated_user = await UserService.update(db, user_id, user_data)
-    if not updated_user:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+    
+    try:
+        updated_user = await UserService.update(db, user_id, user_data)
+        
+        if not updated_user:
+            # If user was not found or update failed, raise a 404 error
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+        
+        # Return updated user information
+        return UserResponse.model_construct(
+            id=updated_user.id,
+            bio=updated_user.bio,
+            first_name=updated_user.first_name,
+            last_name=updated_user.last_name,
+            nickname=updated_user.nickname,
+            email=updated_user.email,
+            role=updated_user.role,
+            last_login_at=updated_user.last_login_at,
+            profile_picture_url=updated_user.profile_picture_url,
+            github_profile_url=updated_user.github_profile_url,
+            linkedin_profile_url=updated_user.linkedin_profile_url,
+            created_at=updated_user.created_at,
+            updated_at=updated_user.updated_at,
+            links=create_user_links(updated_user.id, request)
+        )
+    
+    except Exception as e:
+        # Log unexpected errors and return a 500 server error
+        logger.error(f"Unexpected error during user update: {e}")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Unexpected error occurred during user update")
 
-    return UserResponse.model_construct(
-        id=updated_user.id,
-        bio=updated_user.bio,
-        first_name=updated_user.first_name,
-        last_name=updated_user.last_name,
-        nickname=updated_user.nickname,
-        email=updated_user.email,
-        role=updated_user.role,
-        last_login_at=updated_user.last_login_at,
-        profile_picture_url=updated_user.profile_picture_url,
-        github_profile_url=updated_user.github_profile_url,
-        linkedin_profile_url=updated_user.linkedin_profile_url,
-        created_at=updated_user.created_at,
-        updated_at=updated_user.updated_at,
-        links=create_user_links(updated_user.id, request)
-    )
 
 
 @router.delete("/users/{user_id}", status_code=status.HTTP_204_NO_CONTENT, name="delete_user", tags=["User Management Requires (Admin or Manager Roles)"])

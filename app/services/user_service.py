@@ -73,25 +73,51 @@ class UserService:
             return None
 
     @classmethod
+    async def authenticate_by_nickname_and_password(cls, session: AsyncSession, email: str, password: str) -> Optional[User]:
+        """
+        Authenticate the user using their nickname and password.
+        
+        :param session: The AsyncSession instance for database access.
+        :param nickname: The nickname used for authentication.
+        :param password: The password provided by the user.
+        :return: The authenticated User object if successful, otherwise None.
+        """
+        user = await cls.get_by_email(session, email)
+        if user and verify_password(password, user.hashed_password):
+            return user
+        return None
+
+    @classmethod
     async def update(cls, session: AsyncSession, user_id: UUID, update_data: Dict[str, str]) -> Optional[User]:
+        """
+        Update a user's profile.
+    
+        :param session: The AsyncSession instance for database access.
+        :param user_id: The ID of the user to update.
+        :param update_data: The data to update the user's profile with.
+        :return: The updated User object if successful, otherwise None.
+        """
         try:
-            # validated_data = UserUpdate(**update_data).dict(exclude_unset=True)
+            # Validate the data and convert to a dictionary
             validated_data = UserUpdate(**update_data).dict(exclude_unset=True)
 
-            if 'password' in validated_data:
-                validated_data['hashed_password'] = hash_password(validated_data.pop('password'))
+            # If password is in the update data, hash it
+            if "password" in validated_data:
+                validated_data["hashed_password"] = hash_password(validated_data.pop("password"))
+            
+            # Update the user data in the database
             query = update(User).where(User.id == user_id).values(**validated_data).execution_options(synchronize_session="fetch")
             await cls._execute_query(session, query)
+
+            # Fetch the updated user
             updated_user = await cls.get_by_id(session, user_id)
             if updated_user:
-                session.refresh(updated_user)  # Explicitly refresh the updated user object
-                logger.info(f"User {user_id} updated successfully.")
+                session.refresh(updated_user)  # Explicitly refresh the updated user object to reflect changes
                 return updated_user
-            else:
-                logger.error(f"User {user_id} not found after update attempt.")
+
             return None
-        except Exception as e:  # Broad exception handling for debugging
-            logger.error(f"Error during user update: {e}")
+        except SQLAlchemyError as e:
+            logger.error(f"Database error: {e}")
             return None
 
     @classmethod
@@ -191,3 +217,4 @@ class UserService:
             await session.commit()
             return True
         return False
+
