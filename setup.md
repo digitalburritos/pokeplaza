@@ -1,22 +1,51 @@
+### Setup Instructions
+1. Fork my repository using GitHub to create your testing repo in your account 
 
-## Project Setup and Commands:
+2. Clone fork locally to your machine using   
+`git clone git@github.com:your_user/your_repo.git`
 
-1. Fork this repository to your own account.
+3. Configure `production.yml` for your dockerhub then create a `.env` file with this structure to add your http://mailtrap.io account inbox. Be sure to populate the username and password:    
+`smtp_server=sandbox.smtp.mailtrap.io`  
+`smtp_port=2525`  
+`smtp_username=`  
+`smtp_password=`
 
-2. Clone the project repository to your local machine.
+4. Start and build a multi-container application with this command:  
+`docker compose up --build`
 
-3. Create a local .env file with your [MailTrap](https://mailtrap.io/) SMTP settings. Mailtrap allows you to view emails when you test the site manually. When running pytest, the system uses a Mock to simulate sending emails but doesn't actually send them.
+5. Goto http://localhost/docs to view openapi spec documentation
+- Click `Authorize`   
+- Input username: `admin@example.com` 
+- Input password: `secret`
 
-4. Alembic and Pytest:
-  - When you run Pytest, it deletes the user table but doesn't remove the Alembic table. This can cause Alembic to get out of sync.
-  - To resolve this, drop the Alembic table and run the migration (`docker compose exec fastapi alembic upgrade head`) when you want to manually test the site through `http://localhost/docs`.
-  - If you change the database schema, delete the Alembic migration, the Alembic table, and the users table. Then, regenerate the migration using the command: `docker compose exec fastapi alembic revision --autogenerate -m 'initial migration'`.
-  - Since there is no real user data currently, you don't need to worry about database upgrades, but Alembic is still required to install the database tables.
+6. Goto http://localhost:5050 to connect and manage the database.
+The following information must match the ones in the docker-compose.yml file.    
+- Login:  
+Email address / Username: `admin@example.com`  
+Password: `adminpassword`  
 
-5. Run the project:
-  - `docker compose up --build`
-  - Set up PGAdmin at `localhost:5050` (see docker compose for login details)
-  - View logs for the app: `docker compose logs fastapi -f`
-  - Run tests: `docker compose exec fastapi pytest`
+- Add new server:  
+Host name/address: `postgres`  
+Port: `5432`  
+Maintenance database: `myappdb`  
+Username: `user`  
+Password: `password` 
+ 
+7. Test API and cross reference DB
+***
+### Pytest Note (PLEASE READ THIS SECTION FULLY BEFORE TESTING)
+- When running pytests inside the containers you can use this command to run all tests:  
+`docker compose exec fastapi pytest`
+- You can also run a single test file with this command:  
+`docker compose exec fastapi pytest tests/test_email.py`
 
-6. Set up the project with DockerHub deployment as in previous assignments for email testing. Enable issues in settings, create the production environment, and configure your DockerHub username and token. You don't need to add MailTrap, but if you want to, you can add the values to the production environment's variables.
+###  Keep in mind that the user data in the DB will be dropped. To ensure you can use the application again without running into Internal Error on openapi, do this:
+1. Go to http://localhost:5050 and delete the `alembic_version` table in your DB server
+
+2. Run the container  
+`docker compose up --build`
+
+3. While the container is running, apply database migrations in a split terminal using this command:  
+`docker compose exec fastapi alembic upgrade head`
+
+- Now you will be able to Authorize your login to connect your DB with your openapi http://localhost/docs
