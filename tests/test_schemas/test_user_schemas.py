@@ -131,4 +131,56 @@ def test_user_update_valid(user_update_data, user_base_data):
     assert user.bio == user_update.bio
     assert user.profile_picture_url == user_update.profile_picture_url
 
+def test_user_update_invalid_email(user_update_data, user_base_data):
+    """Test case to verify that an invalid email format triggers validation error."""
+    # Create user with valid data
+    user = UserBase(**user_base_data)
+    
+    # Set invalid email format
+    user_update_data["email"] = "invalid-email-format"
+    
+    # Check if validation error is raised when attempting to update the email
+    with pytest.raises(ValidationError):
+        UserUpdate(**user_update_data)
+
+def test_user_update_missing_required_fields(user_update_data, user_base_data):
+    """Test case to verify that missing required fields cause validation errors."""
+    # Create user with valid data
+    user = UserBase(**user_base_data)
+    
+    # Remove required fields for testing
+    user_update_data.pop("email")
+    
+    # Attempting to update without email should raise a validation error
+    with pytest.raises(ValidationError):
+        UserUpdate(**user_update_data)
+
+def test_user_update_partial(user_update_data, user_base_data):
+    """Test case to verify partial updates where some fields are unchanged."""
+    # Create user with initial data
+    user = UserBase(**user_base_data)
+    
+    # Simulate updating only part of the user data
+    partial_update_data = {key: value for key, value in user_update_data.items() if key in ['email', 'bio']}
+    user_update = UserUpdate(**partial_update_data)
+    
+    user.email = user_update.email
+    user.bio = user_update.bio
+    
+    # Assert that the fields are updated, and others remain the same
+    assert user.email == user_update.email
+    assert user.bio == user_update.bio
+    assert user.nickname == user_base_data["nickname"]  # Check if nickname is unaffected
+
+def test_user_update_invalid_url(user_update_data, user_base_data):
+    """Test case to verify that an invalid URL format triggers a validation error."""
+    # Create user with valid data
+    user = UserBase(**user_base_data)
+    
+    # Set invalid URL format in the update data
+    user_update_data["profile_picture_url"] = "ftp://invalid-url.com/profile.jpg"
+    
+    # Attempting to update the user with an invalid URL should raise a validation error
+    with pytest.raises(ValidationError):
+        UserUpdate(**user_update_data)
 
