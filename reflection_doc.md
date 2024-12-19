@@ -1,4 +1,5 @@
 # Reflection Document
+![alt text](image.png)
 ## Learnings
 In developing the user profile management feature with the ability to upgrade users to professional status, I gained a deeper understanding of several key concepts in full-stack development, especially in handling role-based authorization, implementing APIs, and managing database interactions asynchronously.
 
@@ -29,5 +30,5 @@ Configuration: The user making the request must have the appropriate role. If th
 The feature was implemented in FastAPI, which provided a clear, efficient framework for developing RESTful APIs with automatic validation and documentation. The database interactions were handled through SQLAlchemy with async support, ensuring that the system can scale effectively. Additionally, validation was added using Pydantic models to ensure the integrity of the data entered.
 
 ## Conclusion
-In conclusion, this feature not only meets the requirements outlined in the user story but also enhanced my understanding of handling role-based access control, asynchronous database management, and user data validation. I believe this implementation significantly improves the user profile management experience by allowing for easy updates and providing an important mechanism for upgrading user status to PROFESSIONAL while keeping the system secure and efficient.
+In conclusion, this feature not only meets the requirements outlined in the user story but also enhanced my understanding of handling role-based access control, asynchronous database management, and user data validation. I believe this implementation significantly improves the user profile management experience by allowing for easy updates and providing an important mechanism for upgrading user status to PROFESSIONAL while keeping the system secure and efficient. Test cases were added for quality assurance. Thank you for a great semester!
 
