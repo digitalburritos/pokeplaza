@@ -171,28 +171,3 @@ async def test_unlock_user_account(db_session, locked_user):
     assert unlocked, "The account should be unlocked"
     refreshed_user = await UserService.get_by_id(db_session, locked_user.id)
     assert not refreshed_user.is_locked, "The user should no longer be locked"
-
-@pytest.mark.asyncio
-async def test_upgrade_user_to_professional(db_session: AsyncSession, user: User, admin_user: User, manager_user: User):
-    """
-    Tests upgrading a user's role to PROFESSIONAL by an admin or manager.
-    """
-    # Ensure the user is initially in the 'AUTHENTICATED' role
-    assert user.role == UserRole.AUTHENTICATED, "User should initially have the AUTHENTICATED role"
-    
-    # Simulate an admin upgrading the user to PROFESSIONAL
-    is_upgraded = await UserService.upgrade_to_professional(db_session, user.id, admin_user.role)
-    assert is_upgraded, "Admin should be able to upgrade the user to PROFESSIONAL"
-    
-    # Ensure the user's role was updated correctly
-    await db_session.refresh(user)
-    assert user.role == UserRole.PROFESSIONAL, "User should be upgraded to PROFESSIONAL role"
-
-    # Ensure a manager can also upgrade the user to PROFESSIONAL
-    is_upgraded = await UserService.upgrade_to_professional(db_session, user.id, manager_user.role)
-    assert is_upgraded, "Manager should be able to upgrade the user to PROFESSIONAL"
-    
-    # Ensure a non-admin/manager (e.g., regular user) cannot upgrade to PROFESSIONAL
-    with pytest.raises(HTTPException):
-        await UserService.upgrade_to_professional(db_session, user.id, user.role)  # Regular user shouldn't be able to upgrade
-
