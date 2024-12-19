@@ -1,10 +1,13 @@
 from builtins import range
 import pytest
-from sqlalchemy import select
+from sqlalchemy.future import select
 from app.dependencies import get_settings
 from app.models.user_model import User, UserRole
 from app.services.user_service import UserService
 from app.utils.nickname_gen import generate_nickname
+from sqlalchemy.ext.asyncio import AsyncSession
+from fastapi import HTTPException
+from pydantic import ValidationError
 
 pytestmark = pytest.mark.asyncio
 
@@ -68,10 +71,17 @@ async def test_update_user_valid_data(db_session, user):
     assert updated_user is not None
     assert updated_user.email == new_email
 
-# Test updating a user with invalid data
+@pytest.mark.asyncio
 async def test_update_user_invalid_data(db_session, user):
-    updated_user = await UserService.update(db_session, user.id, {"email": "invalidemail"})
-    assert updated_user is None
+    """
+    Tests updating a user with invalid data (e.g., invalid email).
+    """
+    # Attempt to update with invalid email
+    with pytest.raises(ValidationError) as exc_info:
+        await UserService.update(db_session, user.id, {"email": "invalidemail"})
+    
+    # Validate that the error is related to the invalid email
+    assert "value is not a valid email address" in str(exc_info.value), "ValidationError should be raised for invalid email format"
 
 # Test deleting a user who exists
 async def test_delete_user_exists(db_session, user):
@@ -161,3 +171,28 @@ async def test_unlock_user_account(db_session, locked_user):
     assert unlocked, "The account should be unlocked"
     refreshed_user = await UserService.get_by_id(db_session, locked_user.id)
     assert not refreshed_user.is_locked, "The user should no longer be locked"
+
+@pytest.mark.asyncio
+async def test_upgrade_user_to_professional(db_session: AsyncSession, user: User, admin_user: User, manager_user: User):
+    """
+    Tests upgrading a user's role to PROFESSIONAL by an admin or manager.
+    """
+    # Ensure the user is initially in the 'AUTHENTICATED' role
+    assert user.role == UserRole.AUTHENTICATED, "User should initially have the AUTHENTICATED role"
+    
+    # Simulate an admin upgrading the user to PROFESSIONAL
+    is_upgraded = await UserService.upgrade_to_professional(db_session, user.id, admin_user.role)
+    assert is_upgraded, "Admin should be able to upgrade the user to PROFESSIONAL"
+    
+    # Ensure the user's role was updated correctly
+    await db_session.refresh(user)
+    assert user.role == UserRole.PROFESSIONAL, "User should be upgraded to PROFESSIONAL role"
+
+    # Ensure a manager can also upgrade the user to PROFESSIONAL
+    is_upgraded = await UserService.upgrade_to_professional(db_session, user.id, manager_user.role)
+    assert is_upgraded, "Manager should be able to upgrade the user to PROFESSIONAL"
+    
+    # Ensure a non-admin/manager (e.g., regular user) cannot upgrade to PROFESSIONAL
+    with pytest.raises(HTTPException):
+        await UserService.upgrade_to_professional(db_session, user.id, user.role)  # Regular user shouldn't be able to upgrade
+

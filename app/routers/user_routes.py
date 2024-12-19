@@ -24,16 +24,17 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Response, status, Request
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.future import select
 from app.dependencies import get_current_user, get_db, get_email_service, require_role
 from app.schemas.pagination_schema import EnhancedPagination
 from app.schemas.token_schema import TokenResponse
-from app.schemas.user_schemas import LoginRequest, UserBase, UserCreate, UserListResponse, UserResponse, UserUpdate
+from app.schemas.user_schemas import LoginRequest, UserBase, UserCreate, UserListResponse, UserResponse, UserUpdate, RoleUpdate
 from app.services.user_service import UserService
 from app.services.jwt_service import create_access_token
 from app.utils.link_generation import create_user_links, generate_pagination_links
 from app.dependencies import get_settings
 from app.services.email_service import EmailService
-from app.utils.security import hash_password
+from app.models.user_model import User
 import logging
 
 router = APIRouter()
@@ -130,6 +131,32 @@ async def update_user(
         logger.error(f"Unexpected error during user update: {e}")
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Unexpected error occurred during user update")
 
+@router.put("/users/{user_id}/upgrade", response_model=UserResponse, name="upgrade_user", tags=["User Management Requires (Admin or Manager Roles)"])
+async def upgrade_user_to_professional(
+    user_id: UUID, 
+    db: AsyncSession = Depends(get_db), 
+    current_user: dict = Depends(require_role(["ADMIN", "MANAGER"]))
+):
+    """
+    Upgrade a user to professional status (ADMIN or MANAGER role required).
+    - **user_id**: UUID of the user to upgrade.
+    """
+    # Call the service layer to perform the upgrade
+    success = await UserService.upgrade_to_professional(
+        db, user_id, current_user_role=current_user["role"]
+    )
+
+    if not success:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found or could not be upgraded"
+        )
+
+    # Fetch the updated user to return the response model
+    user_query = await db.execute(select(User).where(User.id == user_id))
+    user = user_query.scalar_one()
+
+    return UserResponse.from_orm(user)
 
 
 @router.delete("/users/{user_id}", status_code=status.HTTP_204_NO_CONTENT, name="delete_user", tags=["User Management Requires (Admin or Manager Roles)"])

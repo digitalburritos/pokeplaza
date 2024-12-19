@@ -14,6 +14,7 @@ from app.utils.security import generate_verification_token, hash_password, verif
 from uuid import UUID
 from app.services.email_service import EmailService
 from app.models.user_model import UserRole
+from fastapi import HTTPException, status
 import logging
 
 settings = get_settings()
@@ -218,3 +219,32 @@ class UserService:
             return True
         return False
 
+   
+    @staticmethod
+    async def upgrade_to_professional(session: AsyncSession, user_id: UUID, current_user_role: str) -> bool:
+        """
+        Upgrade a user to professional status (setting their `is_professional` to True).
+       
+        - Only admins or managers can upgrade a user.
+        """
+        # Ensure only admins or managers can upgrade
+        if current_user_role not in ["ADMIN", "MANAGER"]:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Only managers or admins can upgrade to PROFESSIONAL"
+            )
+
+        # Retrieve the user by user_id
+        query = select(User).where(User.id == user_id)
+        result = await session.execute(query)
+        user = result.scalar_one_or_none()
+
+        if user:
+            # Set the user's is_professional to True
+            user.is_professional = True
+            user.professional_status_updated_at = datetime.utcnow()  # Optionally update the timestamp
+            session.add(user)
+            await session.commit()
+            return True
+
+        return False
